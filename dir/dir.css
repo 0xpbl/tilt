@@ -92,6 +92,29 @@ button:hover, input[type="search"]:focus{
   padding: 12px 14px;
 }
 
+.file-index{
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  font-size: 13px;
+}
+
+.file-index a{
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.file-index a:hover{ text-decoration: underline; }
+
+.file-index a.active{
+  color: var(--fg);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
 .toc{
   margin-bottom: 10px;
   padding-bottom: 10px;
@@ -111,6 +134,30 @@ button:hover, input[type="search"]:focus{
 
 /* Keep the “txt feel”, but allow wrapping if you want: */
 /* white-space controls wrapping/preservation of spaces/newlines :contentReference[oaicite:4]{index=4} */
+.error-container{
+  margin: 10px 0;
+  padding: 10px;
+  text-align: center;
+}
+
+.error-container p{
+  margin: 10px 0;
+  color: var(--dim);
+}
+
+.error-container h1{
+  margin: 20px 0;
+}
+
+.error-container a{
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.error-container a:hover{
+  text-decoration: underline;
+}
+
 .listing{
   margin: 0;
   white-space: pre-wrap;
