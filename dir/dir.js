@@ -1,20 +1,18 @@
 const FILES_DIR = "./files/";
-// Lista inicial de arquivos conhecidos para tentar descobrir
-// Atualize esta lista quando adicionar novos arquivos .txt na pasta files/
 const FILES_TO_TRY = ["recomendati0n.txt"];
 
 let FILES_LIST = [];
 
-const elListing = document.getElementById("listing");
+let elListing = document.getElementById("listing");
 const elToc = document.getElementById("toc");
 const elFileIndex = document.getElementById("file-index");
 const elErrorContainer = document.getElementById("error-container");
 const elQ = document.getElementById("q");
 const elClear = document.getElementById("clear");
+const elListingOriginal = elListing;
 
 let currentFile = "";
-let model = []; // [{type:'heading'|'link'|'text', ...}]
-let rendered = ""; // string pre-rendered with anchors
+let rendered = "";
 
 function slugify(s){
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
@@ -57,7 +55,6 @@ function parse(text){
       continue;
     }
 
-    // free text / notes
     current.items.push({ type: "text", text: raw });
   }
 
@@ -65,14 +62,11 @@ function parse(text){
 }
 
 function render(sections){
-  // Build TOC
   elToc.innerHTML = sections
     .filter(s => s.items.some(i => i.type !== "blank"))
     .map(s => `<a href="#${s.id}">${escapeHtml(s.title)}</a>`)
     .join("");
 
-  // Render in one PRE, but with anchor-like markers + HTML links
-  // Note: we keep the "txt feel" by using PRE and short separators.
   const out = [];
   for (const s of sections){
     out.push(`\n== ${s.title} ==`);
@@ -84,7 +78,6 @@ function render(sections){
         out.push(escapeHtml(it.text));
       } else if (it.type === "link"){
         const u = it.url;
-        // show as clickable while retaining plain URL appearance
         out.push(`<a href="${u}" rel="noreferrer noopener" target="_blank">${u}</a>`);
       }
     }
@@ -99,7 +92,6 @@ function applyFilter(q){
     return;
   }
 
-  // Filter by hiding lines that don't match (simple and very "txt")
   const lines = rendered.split("\n");
   const kept = lines.filter(l => l.toLowerCase().includes(query) || l.startsWith("== ") || l.startsWith("[#"));
   elListing.innerHTML = kept.join("\n");
@@ -126,11 +118,7 @@ function renderFileIndex(files, current){
   });
 }
 
-function showError(){
-  elListing.style.display = "none";
-  elErrorContainer.style.display = "block";
-  
-  // Create iframe with Neko HTML to avoid document.write() issues
+function createNekoIframe(containerId){
   const nekoHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -143,26 +131,94 @@ function showError(){
 </body>
 </html>`;
   
-  elErrorContainer.innerHTML = `
-    <p>oops, i don't know but look at the cat</p>
-    <iframe id="neko-iframe" style="border:none;width:100%;min-height:100px;background:transparent;" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
-  `;
+  const iframe = document.createElement("iframe");
+  iframe.id = "neko-iframe";
+  iframe.style.cssText = "border:none;width:100%;min-height:100px;background:transparent;";
+  iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-forms");
+  iframe.srcdoc = nekoHtml;
   
-  const iframe = document.getElementById("neko-iframe");
-  if (iframe) {
-    iframe.srcdoc = nekoHtml;
+  const container = document.getElementById(containerId);
+  if (container) {
+    container.appendChild(iframe);
   }
+  
+  return iframe;
+}
+
+function showError(){
+  elListing.style.display = "none";
+  elErrorContainer.style.display = "block";
+  
+  elErrorContainer.innerHTML = `<p>oops, i don't know but look at the cat</p>`;
+  createNekoIframe("error-container");
+}
+
+function showHomePage(){
+  if (window.location.hash) {
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+  
+  elErrorContainer.style.display = "none";
+  elToc.innerHTML = "";
+  elQ.value = "";
+  currentFile = "";
+  renderFileIndex(FILES_LIST, "");
+  
+  const parent = elListing.parentElement;
+  if (elListing.id !== "listing") {
+    // We're using a wrapper, restore the original
+    parent.replaceChild(elListingOriginal, elListing);
+    elListing = elListingOriginal;
+  }
+  
+  elListing.style.display = "block";
+  
+  const randomContent = `welcome to the mildly organized pile
+
+here you'll find a collection of internet oddities
+curated with questionable taste and questionable methods
+
+things that made someone go "hmm"
+things that made someone go "why"
+things that made someone go "what"
+
+click on a file above to explore
+or just stare at the cat for a while
+
+the internet is weird
+and that's okay`;
+
+  const wrapper = document.createElement("div");
+  wrapper.id = "home-content-wrapper";
+  const textPre = document.createElement("pre");
+  textPre.style.cssText = "margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.45;";
+  textPre.textContent = randomContent;
+  wrapper.appendChild(textPre);
+  
+  const nekoContainer = document.createElement("div");
+  nekoContainer.id = "home-neko-container";
+  nekoContainer.style.cssText = "margin-top:20px;text-align:center;";
+  wrapper.appendChild(nekoContainer);
+  parent.replaceChild(wrapper, elListing);
+  elListing = wrapper;
+  createNekoIframe("home-neko-container");
 }
 
 async function loadFile(filename){
   currentFile = filename;
   const filePath = `${FILES_DIR}${filename}`;
   
-  elListing.style.display = "block";
   elErrorContainer.style.display = "none";
+  const parent = elListing.parentElement;
+  if (elListing.id !== "listing") {
+    // We're using a wrapper, restore the original
+    parent.replaceChild(elListingOriginal, elListing);
+    elListing = elListingOriginal;
+  }
+  
+  elListing.style.display = "block";
   elListing.textContent = `Loading ${filename}…`;
   
-  // Check if we're using file:// protocol (CORS will block fetch)
   const isFileProtocol = window.location.protocol === 'file:';
   if (isFileProtocol) {
     elListing.innerHTML = `
@@ -185,14 +241,8 @@ async function loadFile(filename){
     const sections = parse(text);
     rendered = render(sections);
     elListing.innerHTML = rendered;
-    
-    // Update file index to show active file
     renderFileIndex(FILES_LIST, currentFile);
-    
-    // Update URL hash
     window.location.hash = filename;
-    
-    // Clear filter when switching files
     elQ.value = "";
     applyFilter("");
   } catch (err) {
@@ -202,36 +252,25 @@ async function loadFile(filename){
 
 async function discoverFiles(){
   const discoveredFiles = [];
-  
-  // Check if we're running from file:// protocol (CORS will block)
   const isFileProtocol = window.location.protocol === 'file:';
   
-  // If file protocol, we can't use fetch, so just use the known files list
   if (isFileProtocol) {
     FILES_LIST = FILES_TO_TRY;
     return;
   }
   
-  // Try to discover files by attempting to load them
-  // Start with known files list
   const filesToCheck = [...FILES_TO_TRY];
-  
-  // Try each file and see if it exists
-  // Use Promise.allSettled to try all files in parallel
   const checks = filesToCheck.map(async (filename) => {
     try {
       const filePath = `${FILES_DIR}${filename}`;
-      // Try HEAD first (faster), fallback to GET if HEAD fails
       let res = await fetch(filePath, { method: "HEAD", cache: "no-store" }).catch(() => null);
       if (!res || !res.ok) {
-        // If HEAD failed, try GET (some servers don't support HEAD)
         res = await fetch(filePath, { method: "GET", cache: "no-store" });
       }
       if (res.ok) {
         return filename;
       }
     } catch (err) {
-      // File doesn't exist or can't be accessed
     }
     return null;
   });
@@ -243,30 +282,22 @@ async function discoverFiles(){
     }
   });
   
-  // If we found files, use them; otherwise use the initial list as fallback
-  if (discoveredFiles.length > 0) {
-    FILES_LIST = discoveredFiles;
-  } else {
-    // Fallback: use the initial list (will show errors if files don't exist)
-    FILES_LIST = FILES_TO_TRY;
-  }
+  FILES_LIST = discoveredFiles.length > 0 ? discoveredFiles : FILES_TO_TRY;
 }
 
 async function main(){
-  // Discover files automatically
   await discoverFiles();
-  
-  // Render file index
   renderFileIndex(FILES_LIST, "");
   
-  // Determine which file to load from URL hash or default
   const hash = window.location.hash.slice(1);
-  const defaultFile = FILES_LIST[0];
-  const fileToLoad = hash && FILES_LIST.includes(hash) ? hash : defaultFile;
   
-  // Load the file
-  if (fileToLoad) {
-    await loadFile(fileToLoad);
+  if (hash && FILES_LIST.includes(hash)) {
+    await loadFile(hash);
+  } else {
+    if (hash) {
+      window.history.replaceState(null, '', window.location.pathname);
+    }
+    showHomePage();
   }
 
   elQ.addEventListener("input", () => applyFilter(elQ.value));
@@ -276,11 +307,12 @@ async function main(){
     elQ.focus();
   });
 
-  // Handle hash changes (for direct links to files)
   window.addEventListener("hashchange", () => {
     const hash = window.location.hash.slice(1);
     if (hash && FILES_LIST.includes(hash) && hash !== currentFile) {
       loadFile(hash);
+    } else if (!hash) {
+      showHomePage();
     }
   });
 }
